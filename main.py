@@ -6,13 +6,30 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
-from pdf import genEquipmentURLs
+from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor
 
-QR_CODE_FORMATS = [
-    "Grand Vertical (largeur, hauteur) = (10.4 cm, 14.7 cm)", 
-    "Moyen Horizontal (largeur, hauteur) = (10.4 cm, 4.8 cm) ", 
-    "Petit Carré (largeur, hauteur) = (6.9 cm, 6.7 cm)"
-]
+# TODO : refactor this to a configuration object class. 
+def reset() -> dict:
+    return {
+    "Grand Vertical (largeur, hauteur) = (10.4 cm, 14.7 cm)": { 
+        'models': [],
+        'rows': pd.DataFrame(), 
+        'func': genLargeVerticalQRPDFsFor 
+    },
+    "Moyen Horizontal (largeur, hauteur) = (10.4 cm, 4.8 cm)": { 
+        'models': [], 
+        'rows': pd.DataFrame(), 
+        'func': genMediumHorizontalQRPDFsFor
+    },
+    "Petit Carré (largeur, hauteur) = (6.9 cm, 6.7 cm)": { 
+        'models': [], 
+        'rows': pd.DataFrame(), 
+        'func': genSmallSquareQRPDFsFor
+    }
+} 
+
+# Hardcoded QR code formats and their respective models list and generation function.
+QR_CODE_FORMATS = reset()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -50,14 +67,18 @@ class MainWindow(QMainWindow):
         # Enable drag-and-drop functionality https://doc.qt.io/qt-6/qwidget.html#acceptDrops-prop
         # allows registering a dropEvent() hook
         self.setAcceptDrops(True)
-
+        
+        # either columns with information about EZV equipments or meeting rooms.
+        self.eq_mand_cols = ["Modèle", "Code matériel", "Catégorie", "Numéro de Série"]
+        self.room_mand_cols =  ["Numéro de Signalétique", "Localisation"]
+        
     def open_file_dialog(self, event=None):
         file_path, _ = QFileDialog.getOpenFileName(self, "Séléctionner le CSV d'inventaire EasyVista", "", "CSV Files (*.csv)")
         if file_path:
             self.process_csv(file_path)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():
+        if event.mimeData().hasUrls():                  # TODO : review this code, seems redundant with dropEvent
             event.accept()
         else:
             event.ignore()
@@ -88,33 +109,27 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def on_generate_clicked(self, _):
-        print("Processing...", self.scroll_layout.count())
-        
-        smallSquareQRs = []
-        largeVertQRs = []
-        medHoriQRs = []
-        
-        qr_formats = {
-            0: [],
-            1: [],
-            2: []
-        }
-        
-        for i in range(1, self.scroll_layout.count()):
-            # get the i-th horizontal model box (QHBoxLayout), get the third widget (QComboBox)
-            print(self.scroll_layout.itemAt(i).itemAt(1).widget().text(), self.scroll_layout.itemAt(i).itemAt(3).widget().currentText())
-            print(self.scroll_layout.itemAt(i).itemAt(3).widget().currentIndex())
-            
-            # add model to the corresponding format model list
-            qr_formats[self.scroll_layout.itemAt(i).itemAt(3).widget().currentIndex()].append(self.scroll_layout.itemAt(i).itemAt(1).widget().text())
-            
-            
-        pprint(qr_formats)
-        #genEquipmentURLs(self.csv_df)
-        #self.start_loading()
-        #pass
+        QR_CODE_FORMATS = reset()
     
-    def start_loading(self):
+        if self.is_eq_csv:                                          # if we're dealing with equipments list (no model column)
+            for i in range(1, self.scroll_layout.count()):
+                qr_format = self.scroll_layout.itemAt(i).itemAt(3).widget().currentText() 
+                model = self.scroll_layout.itemAt(i).itemAt(1).widget().text()
+                QR_CODE_FORMATS[qr_format]['models'].append(model)
+                
+            for qr_format in QR_CODE_FORMATS:
+                QR_CODE_FORMATS[qr_format]['rows'] = self.csv_df[self.csv_df['Modèle'].isin(QR_CODE_FORMATS[qr_format]['models'])][self.eq_mand_cols].sort_values("Modèle")
+        
+            for qr_format in QR_CODE_FORMATS.keys():
+                QR_CODE_FORMATS[qr_format]['func'](self.is_eq_csv, QR_CODE_FORMATS[qr_format]['rows'])      # call generate QR codes for equipment.
+                
+        else:
+            # retrive the selected qr format for meeting rooms csv (only one model)
+            qr_format = self.scroll_layout.itemAt(1).itemAt(3).widget().currentText()
+            QR_CODE_FORMATS[qr_format]['rows'] = self.csv_df[self.room_mand_cols]
+            QR_CODE_FORMATS[qr_format]['func'](self.is_eq_csv, QR_CODE_FORMATS[qr_format]['rows'])          # call generate QR codes for meeting rooms.
+    
+    def start_loading(self):            # TODO : cleanup and merge with pdf writing logic. 
         self.value = 0
         self.progress.setValue(self.value)
         self.timer.start(50)  # update every 50ms
@@ -138,34 +153,30 @@ class MainWindow(QMainWindow):
             self.csv_df: pd.DataFrame = pd.read_csv(file_path, sep=";", index_col=False)
             csv_cols = set(self.csv_df.columns.to_list()) 
             
-            # either columns with information about EZV equipments or meeting rooms.
-            eq_mand_cols = set(["Modèle", "Code matériel", "Catégorie"])
-            room_mand_cols =  set(["Numéro de Signalétique", "Localisation"])
             
-            is_eq_csv = eq_mand_cols.issubset(csv_cols)
-            is_room_csv = room_mand_cols.issubset(csv_cols)
+            self.is_eq_csv = set(self.eq_mand_cols).issubset(csv_cols)
+            is_room_csv = set(self.room_mand_cols).issubset(csv_cols)
             
-            if not (is_eq_csv or is_room_csv):
-                self.drop_label.setText(f"Format de CSV non valide. Fournissez soit {eq_mand_cols} pour des équipements, soit {room_mand_cols} pour des salles de réunion.")
+            if not (self.is_eq_csv or is_room_csv):
+                self.drop_label.setText(f"Format de CSV non valide. Fournissez soit {self.eq_mand_cols} pour des équipements, soit {self.room_mand_cols} pour des salles de réunion.")
                 return 1
             
-            mand_cols = eq_mand_cols if is_eq_csv else room_mand_cols
+            mand_cols = self.eq_mand_cols if self.is_eq_csv else self.room_mand_cols
             for mand_col in mand_cols:
                 if self.col_contains_blanks(self.csv_df[mand_col]):
                     self.drop_label.setText(f"Format de CSV non valide. Colonne '{mand_col}' contient des valeurs vides.")
                     return 1
                 
             # retrieve list of equipment models.
-            unique_models: list[str] = self.csv_df["Modèle"].dropna().unique().tolist() if is_eq_csv else ["Salle de Réunion"]
+            unique_models: list[str] = self.csv_df["Modèle"].dropna().unique().tolist() if self.is_eq_csv else ["Salle de Réunion"]
             unique_models.sort()
             
             if len(unique_models) == 0: 
                 self.drop_label.setText("Aucun équipement présent dans le fichier.")
                 return 1
             
-            print(unique_models)
             # Add title
-            title_label = QLabel("Veuillez Choisir le format de QR code par Modèle d'Équipement" if is_eq_csv else "Choissisez le format de QR code")
+            title_label = QLabel("Veuillez Choisir le format de QR code par Modèle d'Équipement" if self.is_eq_csv else "Choissisez le format de QR code")
             title_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)  # Align inside the label
             title_label.setStyleSheet("font-weight: bold; font-size: 16px;")
             self.scroll_layout.addWidget(title_label)
@@ -180,14 +191,14 @@ class MainWindow(QMainWindow):
                 model_label = QLabel(model.strip())
                 
                 # if it's an equipments csv, count number of instances per model, otherwise, it's a meeting room csv, only one type, with number of lines instances.
-                count_label = QLabel("(" + str(self.csv_df["Modèle"].value_counts()[model] if is_eq_csv else self.csv_df.count().iloc[0]) + " instances)")
+                count_label = QLabel("(" + str(self.csv_df["Modèle"].value_counts()[model] if self.is_eq_csv else self.csv_df.count().iloc[0]) + " instances)")
                 # A QComboBox is a compact way to present a list of options to the user. A combobox is 
                 # a selection widget that shows the current item, and pops up a list of selectable items 
                 # when clicked. Comboboxes can contain pixmaps as well as strings if the insertItem() 
                 # and setItemText() functions are suitably overloaded.
                 dropdown = QComboBox()
                 dropdown.setFixedWidth(350)
-                dropdown.addItems(QR_CODE_FORMATS)
+                dropdown.addItems(list(QR_CODE_FORMATS.keys()))      # list of descriptive strings.
 
                 remove_button = QPushButton("X")
                 remove_button.setFixedWidth(30)  # Set width for the button
