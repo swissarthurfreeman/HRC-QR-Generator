@@ -1,14 +1,13 @@
-import sys
+import sys, os
 import pandas as pd
 from collections.abc import Callable
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QFileDialog, QWidget, QScrollArea, QPushButton, QHBoxLayout, QProgressBar
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
 
-# TODO : pass progress bar widget to generator functions to update it's progress state.
 
 class QRCodeFormat:
     def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState], None]):
@@ -107,9 +106,6 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         
         self.layout.addWidget(self.progress)
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.handle_timer)
-        self.value = 0
         
     def read_and_validate_csv(self, file_path):
         """Read and validate CSV file. Expects a non empty utf-8 file containing either `eq_mand_cols` or `room_mand_cols` defined 
@@ -208,6 +204,14 @@ class MainWindow(QMainWindow):
         else:
             qrFormat = self.scroll_layout.itemAt(1).itemAt(3).widget().currentText()                       # type: ignore retrive the selected qr format for meeting rooms csv (only one model)
             self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar)   # call generate QR codes for meeting rooms.
+        
+        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath("output")))
+        #label = QLabel(f"<a href='{pdf_folder}'>Open folder with generated PDFs</a>")
+        #label.setOpenExternalLinks(True)
+        
+        #self.layout.addWidget(label)
+        #self.setAcceptDrops(True)
+        
                     
     def col_contains_blanks(self, col: pd.Series) -> bool:
         return col.isna().any() or col.astype(str).str.strip().eq("").any()

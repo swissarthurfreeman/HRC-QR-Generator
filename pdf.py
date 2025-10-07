@@ -13,6 +13,7 @@ from qrcode.image.styledpil import StyledPilImage
 from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 from qrcode.image.styles.colormasks import SolidFillColorMask
 
+from qrcode.constants import ERROR_CORRECT_L
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtWidgets import QProgressBar, QProgressBar, QLabel
 
@@ -27,11 +28,11 @@ HRC_LOGO_WIDTH = 62 * mm
 HRC_LOGO_HEIGHT = 24 * mm
 
 def getUrlFrom(row: pd.Series):
-    params = {
-        "Catégorie": "Salle de Réunion"     # will be overwritten if equipments CSV was provided, otherwise it's meeting rooms.
-    }
-    for col in row.index: params[col] = row[col]
+    params = { "Catégorie": "Salle de Réunion" }     # will be overwritten if equipments CSV was provided, otherwise it's meeting rooms.
     
+    for col in row.index: 
+        params[col] = cast(str, row[col])
+
     encoded_query = urlencode(params, encoding='utf-8')
     return "https://apps-hrc.adi.adies.lan/mailer/new-ticket?" + encoded_query
 
@@ -117,7 +118,7 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     
     outputPath = "./output/mediumHorizontalQRs.pdf"
     
-    c = canvas.Canvas(outputPath, pageSize=A4)
+    c = canvas.Canvas(outputPath, pagesize=A4)
     pdfmetrics.registerFont(TTFont('NettoVDR', './assets/Netto-Regular.ttf'))
     c.setFont("NettoVDR", fontSize)
     
@@ -183,7 +184,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     
     outputPath = "./output/smallSquarePDFs.pdf"
     
-    c = canvas.Canvas(outputPath, pageSize=A4)
+    c = canvas.Canvas(outputPath, pagesize=A4)
     pdfmetrics.registerFont(TTFont('NettoVDR', './assets/Netto-Regular.ttf'))
     c.setFont("NettoVDR", fontSize)
     
@@ -234,7 +235,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
         
         
 def getQRImageReaderFromRow(url: str) -> ImageReader:
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L)
+    qr = qrcode.QRCode(error_correction=ERROR_CORRECT_L)
     qr.add_data(url)
     qr_code = qr.make_image(
         image_factory=StyledPilImage, 
