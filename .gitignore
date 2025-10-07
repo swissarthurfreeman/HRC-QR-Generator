@@ -4,9 +4,3 @@ build
 dist
 /build/
 /dist/
-/output/
-output/**
-/output/**
-output/largeVerticalQRs.pdf
-output/mediumHorizontalQRs.pdf
-output/smallSquarePDFs.pdf

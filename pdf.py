@@ -1,6 +1,7 @@
 import qrcode
 import textwrap
 import pandas as pd
+from typing import cast
 from urllib.parse import urlencode
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
@@ -11,6 +12,14 @@ from reportlab.lib.utils import ImageReader
 from qrcode.image.styledpil import StyledPilImage
 from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 from qrcode.image.styles.colormasks import SolidFillColorMask
+
+from PyQt6.QtCore import QCoreApplication
+from PyQt6.QtWidgets import QProgressBar, QProgressBar, QLabel
+
+class ProgressBarState:     # state is set by main window when a file is loaded.
+    def __init__(self, progressBar: QProgressBar, label: QLabel):
+        self.progressBar: QProgressBar = progressBar
+        self.label: QLabel = label
 
 
 QR_CODE_CAPTION = "Scannez le QR code avec votre télphone HRC afin de signaler un problème."
@@ -27,8 +36,10 @@ def getUrlFrom(row: pd.Series):
     return "https://apps-hrc.adi.adies.lan/mailer/new-ticket?" + encoded_query
 
 
-def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame): 
+def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState): 
+    progressBar.progressBar.setValue(0)
     
+    print("genLargeVerticalQRPDFsFor")
     QRCodeSize = 100 * mm
     width, height = A4
     fontSize, charsPerLine = 16, 40
@@ -44,13 +55,23 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame):
     
     count = 0
     
-    for index, row in entries.iterrows():
+    for index, (_, row) in enumerate(entries.iterrows()):
+        
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=1.25*HRC_LOGO_WIDTH, height=1.25*HRC_LOGO_HEIGHT)
         
         y -= QRCodeSize
         x -= 12 * mm
         
-        c.drawImage(getQRImageReaderFromRow(row), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
+        url = getUrlFrom(row)
+        value = round(100 * cast(int, index) / entries.shape[0])
+        print(value)
+        
+        progressBar.label.setText(url)
+        progressBar.progressBar.setValue(value)
+        
+        QCoreApplication.processEvents()                # keep ui responsive by processing events
+        
+        c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
         c.setFont("NettoVDR", fontSize)
         
         wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry.
@@ -78,13 +99,16 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame):
                 x, y = 15 * mm, height - 182 * mm
             elif count == 3:
                 x, y = 119 * mm, height - 182 * mm
-        
+    
+    progressBar.progressBar.setValue(100)
     c.save()
     print(f"LOG: PDF saved as: {outputPath}")
 
 
-def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame): # entries (code, model, image)
+def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState): # entries (code, model, image)
+    progressBar.progressBar.setValue(0)
     
+    print("genMediumHorizontalQRPDFsFor")
     QRCodeSize = 44 * mm
     width, height = A4
     fontSize, charsPerLine = 12, 30
@@ -98,7 +122,7 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame): # entr
     c.setFont("NettoVDR", fontSize)
     
     count = 0
-    for idx, row in entries.iterrows():
+    for index, (_, row) in enumerate(entries.iterrows()):
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
         c.setFont("NettoVDR", fontSize)
         
@@ -117,7 +141,16 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame): # entr
         x += 55*mm                  # move cursor bottom right of text to draw QR code
         y = yText - 5*mm
         
-        c.drawImage(getQRImageReaderFromRow(row), x, y, width=QRCodeSize, height=QRCodeSize)
+        url = getUrlFrom(row)
+        value = round(100 * cast(int, index) / entries.shape[0])
+        print(value)
+        
+        progressBar.label.setText(url)
+        progressBar.progressBar.setValue(value)
+        
+        QCoreApplication.processEvents()                # keep ui responsive by processing events
+        
+        c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)
         
         count += 1
         
@@ -133,11 +166,15 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame): # entr
             x, y = xStart, yStart
             count = 0
     
+    progressBar.progressBar.setValue(100)
     c.save()
     print(f"LOG: PDF saved as :{outputPath}")   
 
 
-def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame):
+def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState):
+    progressBar.progressBar.setValue(0)
+    
+    print("genSmallSquareQRPDFsFor")
     QRCodeSize = 60 * mm
     width, height = A4
     fontSize, charsPerLine = 9, 36
@@ -151,9 +188,18 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame):
     c.setFont("NettoVDR", fontSize)
     
     count = 0
-    for idx, row in entries.iterrows():
+    for index, (_, row) in enumerate(entries.iterrows()):
+        url = getUrlFrom(row)
+        value = round(100 * cast(int, index) / entries.shape[0])
+        print(value)
         
-        c.drawImage(getQRImageReaderFromRow(row), x, y, width=QRCodeSize, height=QRCodeSize)
+        progressBar.label.setText(url)
+        progressBar.progressBar.setValue(value)
+        
+        QCoreApplication.processEvents()                # keep ui responsive by processing events
+        
+        
+        c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)
         c.setFont("NettoVDR", fontSize)
         
         wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry
@@ -180,12 +226,14 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame):
             c.showPage()
             x, y = xStart, yStart
             count = 0
+    
+    progressBar.progressBar.setValue(100)
+    
     c.save()
     print(f"LOG: PDF saved as :{outputPath}")   
         
         
-def getQRImageReaderFromRow(row: pd.Series) -> ImageReader:
-    url = getUrlFrom(row)
+def getQRImageReaderFromRow(url: str) -> ImageReader:
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L)
     qr.add_data(url)
     qr_code = qr.make_image(
