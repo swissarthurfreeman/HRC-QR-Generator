@@ -36,7 +36,9 @@ class GenerationConfig:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        
+        self.reset()
+    
+    def reset(self):
         self.generationConfig: GenerationConfig = GenerationConfig.default()          # configuration of PDF generation, contains PDF function, qr code format and rows associations.
         
         self.setWindowTitle("Générateur de QR codes de matériel EasyVista")
@@ -49,7 +51,7 @@ class MainWindow(QMainWindow):
         
         self.drop_label = QLabel("Glisser et déposer un fichier CSV ici ou clickez afin d'en séléctionner un.") 
         self.drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)                  # Drag-and-drop area, just a dashed line framed label https://doc.qt.io/qt-6/qlabel.html
-        self.drop_label.setStyleSheet("border: 2px dashed #aaa; padding: 20px;")    
+        self.drop_label.setStyleSheet("border: 2px dashed #aaa; padding: 100px; font-size: 24px; font-weight: bold;")    
         self.drop_label.mousePressEvent = self.open_file_dialog # type: ignore
         self.layout.addWidget(self.drop_label)                                      # add the label to the Vertical Layout (drag and drop field | list of models title | list of dropdown selects)
 
@@ -58,6 +60,7 @@ class MainWindow(QMainWindow):
         self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)       # will contain the model, dropdowns, close triples.
         self.scroll_area.setWidget(self.scroll_content)             # child widget (that needs scrollbars) is specified here. Scroll area contains the list of dropdowns 
+        self.scroll_area.setVisible(False)
         self.layout.addWidget(self.scroll_area)                     
 
         self.setAcceptDrops(True)   # Enable drag-and-drop on whole window, requires registering dropEvent() hook https://doc.qt.io/qt-6/qwidget.html#acceptDrops-prop
@@ -65,6 +68,7 @@ class MainWindow(QMainWindow):
         self.eq_mand_cols = ["Modèle", "Code matériel", "Catégorie", "Numéro de Série"]     # mandatory columns or schema of CSV
         self.room_mand_cols =  ["Numéro de Signalétique", "Localisation"]                   # either columns with information about EZV equipments or meeting rooms.
         
+    
     def open_file_dialog(self, event=None):
         file_path, _ = QFileDialog.getOpenFileName(self, "Séléctionner le CSV d'inventaire EasyVista", "", "CSV Files (*.csv)")
         if file_path:
@@ -85,18 +89,20 @@ class MainWindow(QMainWindow):
             self.process_csv(file_path)                             # will throw if provided file isn't valid.
             self.addGenerateButtonAndLoadingBar()               
         except Exception as err:
-            self.drop_label.setText(f"Erreur : {str(err)}")
+            text = f"Erreur : {str(err)}"
+            wrapped_text = "\n".join([text[i:i+70] for i in range(0, len(text), 70)])
+            self.drop_label.setText(wrapped_text)
         
     def addGenerateButtonAndLoadingBar(self):
-        generate_button = QPushButton("Générer!")                  # configure generation button.
-        generate_button.setFixedWidth(100)
-        generate_button.clicked.connect(self.on_generate_clicked)
+        self.generate_button = QPushButton("Générer!")                  # configure generation button.
+        self.generate_button.setFixedWidth(100)
+        self.generate_button.clicked.connect(self.on_generate_clicked)
         
         self.current_url = QLabel("https://...")                        # label to display current URL being processed.
         self.current_url.setAlignment(Qt.AlignmentFlag.AlignRight)
         
         self.gen_curr_url_layout = QHBoxLayout()
-        self.gen_curr_url_layout.addWidget(generate_button)
+        self.gen_curr_url_layout.addWidget(self.generate_button)
         self.gen_curr_url_layout.addWidget(self.current_url)
         
         self.layout.addLayout(self.gen_curr_url_layout)
@@ -111,11 +117,8 @@ class MainWindow(QMainWindow):
         """Read and validate CSV file. Expects a non empty utf-8 file containing either `eq_mand_cols` or `room_mand_cols` defined 
         in the constructor. Equipments: `Numéro de Série, Code matériel, Modèle, Catégorie`, Meeting rooms: `Numéro de 
         Signalétique, Localisation`"""
-        try:    # read and validate it is a CSV
-            self.csv_df: pd.DataFrame = pd.read_csv(file_path, sep=";", index_col=False)
-        except Exception as e:
-            self.drop_label.setText(f"Error processing file: {str(e)}")
-            return 0
+        # read and validate it is a CSV
+        self.csv_df: pd.DataFrame = pd.read_csv(file_path, sep=";", index_col=False)    # this can throw, will be caught in parent except
         
         columns = set(self.csv_df.columns.to_list())                    # check presence of columns
         self.is_eq_csv = set(self.eq_mand_cols).issubset(columns)
@@ -181,6 +184,7 @@ class MainWindow(QMainWindow):
             
         self.drop_label.setVisible(False)
         self.setAcceptDrops(False)
+        self.scroll_area.setVisible(True)
 
     def on_generate_clicked(self, _):
         """Read the dropdown values, associate models to QR code formats, call the PDF generation functions."""
@@ -196,7 +200,8 @@ class MainWindow(QMainWindow):
                 
                 self.scroll_layout.itemAt(i).itemAt(3).widget().setEnabled(False)           # type: ignore
                 self.scroll_layout.itemAt(i).itemAt(0).widget().setEnabled(False)           # type: ignore
-            
+                self.generate_button.setEnabled(False)
+                
             for qrFormat in self.generationConfig.formats:                      # filter to only rows matching the selected models for this format and generate PDFs
                 rowsOfModel = self.csv_df[self.csv_df['Modèle'].isin(self.generationConfig.formats[qrFormat].models)]
                 self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, rowsOfModel, pgBar)    # self.progressBarState initialized in addGenerateButtonAndLoadingBar
@@ -205,13 +210,9 @@ class MainWindow(QMainWindow):
             qrFormat = self.scroll_layout.itemAt(1).itemAt(3).widget().currentText()                       # type: ignore retrive the selected qr format for meeting rooms csv (only one model)
             self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar)   # call generate QR codes for meeting rooms.
         
-        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath("output")))
-        #label = QLabel(f"<a href='{pdf_folder}'>Open folder with generated PDFs</a>")
-        #label.setOpenExternalLinks(True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath("output")))         # open explorer window at place where PDFs were saved.
         
-        #self.layout.addWidget(label)
-        #self.setAcceptDrops(True)
-        
+        self.reset()
                     
     def col_contains_blanks(self, col: pd.Series) -> bool:
         return col.isna().any() or col.astype(str).str.strip().eq("").any()
