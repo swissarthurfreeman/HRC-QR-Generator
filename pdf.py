@@ -13,7 +13,8 @@ from qrcode.image.styledpil import StyledPilImage
 from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 from qrcode.image.styles.colormasks import SolidFillColorMask
 
-from qrcode.constants import ERROR_CORRECT_L
+from PIL import Image
+from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_H
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtWidgets import QProgressBar, QProgressBar, QLabel
 
@@ -26,6 +27,13 @@ class ProgressBarState:     # state is set by main window when a file is loaded.
 QR_CODE_CAPTION = "Scannez le QR code avec votre télphone HRC afin de signaler un problème."
 HRC_LOGO_WIDTH = 62 * mm
 HRC_LOGO_HEIGHT = 24 * mm
+
+LOGO = Image.open("./assets/hrc-logo-simplified.png").convert("RGBA")
+LOGO_SIZE_RATIO: float = 0.3
+LOGO_WIDTH, LOGO_HEIGHT = LOGO.size
+LOGO_WIDTH, LOGO_HEIGHT = int(LOGO_WIDTH*LOGO_SIZE_RATIO), int(LOGO_HEIGHT*LOGO_SIZE_RATIO)
+LOGO = LOGO.resize((LOGO_WIDTH, LOGO_HEIGHT))
+
 
 def getUrlFrom(row: pd.Series):
     params = { "Catégorie": "Salle de Réunion" }     # will be overwritten if equipments CSV was provided, otherwise it's meeting rooms.
@@ -73,6 +81,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
         QCoreApplication.processEvents()                # keep ui responsive by processing events
         
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
+        
         c.setFont("NettoVDR", fontSize)
         
         wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry.
@@ -200,7 +209,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
         QCoreApplication.processEvents()                # keep ui responsive by processing events
         
         
-        c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)
+        c.drawImage(getQRImageReaderFromRow(url, True), x, y, width=QRCodeSize, height=QRCodeSize)
         c.setFont("NettoVDR", fontSize)
         
         wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry
@@ -233,15 +242,22 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     c.save()
     print(f"LOG: PDF saved as :{outputPath}")   
         
-        
-def getQRImageReaderFromRow(url: str) -> ImageReader:
+
+def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
     qr = qrcode.QRCode(error_correction=ERROR_CORRECT_L)
     qr.add_data(url)
-    qr_code = qr.make_image(
+    
+    qr_code: Image.Image = qr.make_image(
         image_factory=StyledPilImage, 
         module_drawer=RoundedModuleDrawer(),
         eye_drawer=RoundedModuleDrawer(),
-        #embedded_image=Image.open("./assets/hrc-logo-simplified.png").resize((462, 183)),
         color_mask=SolidFillColorMask(back_color=(255, 255, 255), front_color=(1, 158, 227))
-    )
-    return ImageReader(qr_code.get_image())
+    ).get_image()
+    
+    if embbed_logo:
+        qr_width, qr_height = qr_code.size
+        pos = ( (qr_width - LOGO_WIDTH) // 2, (qr_height - LOGO_HEIGHT) // 2 )
+        
+        qr_code.paste(LOGO, pos, LOGO)
+    
+    return ImageReader(qr_code)
