@@ -1,3 +1,4 @@
+import ctypes
 import sys, os
 import pandas as pd
 from collections.abc import Callable
@@ -9,10 +10,8 @@ from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
 
-import ctypes
 myappid = 'hrc.exploitation-si.genqr' # arbitrary string
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-
 
 class QRCodeFormat:
     def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState], None]):
