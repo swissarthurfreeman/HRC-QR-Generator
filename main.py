@@ -4,9 +4,14 @@ from collections.abc import Callable
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QFileDialog, QWidget, QScrollArea, QPushButton, QHBoxLayout, QProgressBar
 )
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
+
+import ctypes
+myappid = 'hrc.exploitation-si.genqr' # arbitrary string
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 
 class QRCodeFormat:
@@ -36,6 +41,7 @@ class GenerationConfig:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowIcon(QIcon("./assets/hrc-logo-simplified.png"))
         self.reset()
     
     def reset(self):

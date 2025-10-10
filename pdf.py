@@ -144,9 +144,9 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
             yText -= fontSize
             
         if is_eq_csv:
-            c.drawCentredString(x + QRCodeSize / 2, yText, f"{row["Modèle"]} {row["Code matériel"]}")
+            c.drawCentredString(x + 27*mm, yText, f"{row["Modèle"]} {row["Code matériel"]}")
         else:
-            c.drawCentredString(x + QRCodeSize / 2, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
+            c.drawCentredString(x + 27*mm, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
         y = yText - 5*mm
