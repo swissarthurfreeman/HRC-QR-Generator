@@ -45,7 +45,7 @@ def getUrlFrom(row: pd.Series):
     return "https://apps-hrc.adi.adies.lan/mailer/new-ticket?" + encoded_query
 
 
-def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState): 
+def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf"): 
     progressBar.progressBar.setValue(0)
     
     print("genLargeVerticalQRPDFsFor")
@@ -56,11 +56,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     xStart, yStart = 15 * mm, height - 35 * mm
     x, y = xStart, yStart
     
-    outputPath = "./output/largeVerticalQRs.pdf"
-    
-    c = canvas.Canvas(outputPath, pagesize=A4)
-    pdfmetrics.registerFont(TTFont('NettoVDR', './assets/Netto-Regular.ttf'))
-    c.setFont("NettoVDR", fontSize)
+    c = canvas.Canvas(outputPath + "/largeVerticalQRs.pdf", pagesize=A4)
     
     count = 0
     
@@ -99,7 +95,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     print(f"LOG: PDF saved as: {outputPath}")
 
 
-def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState): # entries (code, model, image)
+def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/mediumHoriQRs.pdf"): # entries (code, model, image)
     progressBar.progressBar.setValue(0)
     
     print("genMediumHorizontalQRPDFsFor")
@@ -109,11 +105,7 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     xStart, yStart = 3 * mm, height - 28 * mm
     x, y = xStart, yStart
     
-    outputPath = "./output/mediumHorizontalQRs.pdf"
-    
-    c = canvas.Canvas(outputPath, pagesize=A4)
-    pdfmetrics.registerFont(TTFont('NettoVDR', './assets/Netto-Regular.ttf'))
-    c.setFont("NettoVDR", fontSize)
+    c = canvas.Canvas(outputPath + "/mediumHoriQRs.pdf", pagesize=A4)
     
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
@@ -150,7 +142,7 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     print(f"LOG: PDF saved as :{outputPath}")   
 
 
-def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState):
+def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf"):
     progressBar.progressBar.setValue(0)
     
     print("genSmallSquareQRPDFsFor")
@@ -160,11 +152,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     xStart, yStart = 2.5 * mm, height - 13 * mm - 58 * mm                                       # top-margin minus 5 height of sticker square (Zweckform 3661)
     x, y = xStart, yStart
     
-    outputPath = "./output/smallSquarePDFs.pdf"
-    
-    c = canvas.Canvas(outputPath, pagesize=A4)
-    pdfmetrics.registerFont(TTFont('NettoVDR', './assets/Netto-Regular.ttf'))
-    c.setFont("NettoVDR", fontSize)
+    c = canvas.Canvas(outputPath + "/smallSquareQRs.pdf", pagesize=A4)
     
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
@@ -216,13 +204,16 @@ def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
 
 
 def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: int, charsPerLine: int, is_eq_csv: bool) -> float:
+    pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
+    pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
     c.setFont("NettoVDR", fontSize)    
     wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry
         
     for line in wLines:
         c.drawCentredString(x + x_margin, yText, line)
         yText -= fontSize
-        
+    
+    c.setFont("NettoBold", fontSize)
     if is_eq_csv:
         c.drawCentredString(x + x_margin, yText, f"{row["Modèle"]} {row["Code matériel"]}")
     else:

@@ -1,12 +1,13 @@
 import ctypes
 import sys, os
 import pandas as pd
+from datetime import datetime
 from collections.abc import Callable
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QFileDialog, QWidget, QScrollArea, QPushButton, QHBoxLayout, QProgressBar
 )
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
 
@@ -14,9 +15,9 @@ myappid = 'hrc.exploitation-si.genqr' # arbitrary string
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 class QRCodeFormat:
-    def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState], None]):
+    def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState, str], None]):
         self.description = description
-        self.generatePDFsFunc: Callable[[bool, pd.DataFrame, ProgressBarState], None] = func
+        self.generatePDFsFunc: Callable[[bool, pd.DataFrame, ProgressBarState, str], None] = func
         self.models: list[str] = []                     # used to filter rows from CSV.
 
 class GenerationConfig:
@@ -46,7 +47,7 @@ class MainWindow(QMainWindow):
     def reset(self):
         self.generationConfig: GenerationConfig = GenerationConfig.default()          # configuration of PDF generation, contains PDF function, qr code format and rows associations.
         
-        self.setWindowTitle("Générateur de QR codes de matériel EasyVista")
+        self.setWindowTitle("Générateur de QR codes de l'informatique HRC")
         self.setGeometry(100, 100, 1200, 600)
 
         self.central_widget: QWidget = QWidget()                     # superclass of Qt elements (button, dropdown, labels...) allows placing, handle clicks, dropdowns etc.                  
@@ -191,10 +192,15 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(False)
         self.scroll_area.setVisible(True)
 
+    def getOutputFolderTimeStampName(self) -> str:
+        folder = str(datetime.now()).replace(":", "").replace(" ", "-")
+        return folder[:folder.find(".")]
+
     def on_generate_clicked(self, _):
         """Read the dropdown values, associate models to QR code formats, call the PDF generation functions."""
         self.generationConfig: GenerationConfig = GenerationConfig.default()            # reset config back to default
-        
+        output_path = f"./output/{self.getOutputFolderTimeStampName()}/"
+                
         pgBar = ProgressBarState(self.progress, self.current_url)                 # initialize progress bar state
         if self.is_eq_csv:                                          # if we're dealing with equipments list (no model column)
             for i in range(1, self.scroll_layout.count()):
@@ -208,12 +214,21 @@ class MainWindow(QMainWindow):
                 self.generate_button.setEnabled(False)
                 
             for qrFormat in self.generationConfig.formats:                      # filter to only rows matching the selected models for this format and generate PDFs
-                rowsOfModel = self.csv_df[self.csv_df['Modèle'].isin(self.generationConfig.formats[qrFormat].models)]
-                self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, rowsOfModel, pgBar)    # self.progressBarState initialized in addGenerateButtonAndLoadingBar
+                rowsWFormat = self.csv_df[self.csv_df['Modèle'].isin(self.generationConfig.formats[qrFormat].models)]
+                
+                categories = set(rowsWFormat['Catégorie'].to_list())        # get categories of equipment using said format
+                
+                for category in categories:                                 # for every category, we have a folder in output
+                    
+                    os.makedirs(output_path + category, exist_ok=True, mode=777)
+                    rowsWFormatAndCategory = rowsWFormat[rowsWFormat['Catégorie'] == category]  # select all equipments with current format of that category, save pdfs in ./output/category/format.pdf  
+                    
+                    self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, rowsWFormatAndCategory, pgBar, output_path + category)    # self.progressBarState initialized in addGenerateButtonAndLoadingBar
                 
         else:
+            
             qrFormat = self.scroll_layout.itemAt(1).itemAt(3).widget().currentText()                       # type: ignore retrive the selected qr format for meeting rooms csv (only one model)
-            self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar)   # call generate QR codes for meeting rooms.
+            self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar, output_path + "Salle de Réunion")   # call generate QR codes for meeting rooms.
         
         QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath("output")))         # open explorer window at place where PDFs were saved.
         
