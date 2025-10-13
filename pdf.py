@@ -72,29 +72,13 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
         x -= 12 * mm
         
         url = getUrlFrom(row)
-        value = round(100 * cast(int, index) / entries.shape[0])
-        print(value)
         
-        progressBar.label.setText(url)
-        progressBar.progressBar.setValue(value)
-        
-        QCoreApplication.processEvents()                # keep ui responsive by processing events
+        updateProgressBar(index, entries, url, progressBar)
         
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
         
-        c.setFont("NettoVDR", fontSize)
+        drawText(c, row, x, QRCodeSize / 2, y, fontSize, charsPerLine, is_eq_csv)
         
-        wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry.
-        yText = y
-        for line in wLines:
-            c.drawCentredString(x + QRCodeSize / 2, yText, line)
-            yText -= fontSize
-        
-        if is_eq_csv:
-            c.drawCentredString(x + QRCodeSize / 2, yText, f"{row["Modèle"]} {row["Code matériel"]}")
-        else:
-            c.drawCentredString(x + QRCodeSize / 2, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
-            
         count += 1
         
         if count % 4 == 0:
@@ -134,32 +118,17 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
-        c.setFont("NettoVDR", fontSize)
         
-        wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry.
-        yText = y - fontSize
         
-        for line in wLines:
-            c.drawCentredString(x + 27*mm, yText, line)
-            yText -= fontSize
-            
-        if is_eq_csv:
-            c.drawCentredString(x + 27*mm, yText, f"{row["Modèle"]} {row["Code matériel"]}")
-        else:
-            c.drawCentredString(x + 27*mm, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
+        yText = drawText(c, row, x, 27*mm, y - fontSize, fontSize, charsPerLine, is_eq_csv)
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
         y = yText - 5*mm
         
         url = getUrlFrom(row)
-        value = round(100 * cast(int, index) / entries.shape[0])
-        print(value)
         
-        progressBar.label.setText(url)
-        progressBar.progressBar.setValue(value)
         
-        QCoreApplication.processEvents()                # keep ui responsive by processing events
-        
+        updateProgressBar(index, entries, url, progressBar)
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)
         
         count += 1
@@ -200,29 +169,12 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
         url = getUrlFrom(row)
-        value = round(100 * cast(int, index) / entries.shape[0])
-        print(value)
         
-        progressBar.label.setText(url)
-        progressBar.progressBar.setValue(value)
-        
-        QCoreApplication.processEvents()                # keep ui responsive by processing events
-        
+        updateProgressBar(index, entries, url, progressBar)
         
         c.drawImage(getQRImageReaderFromRow(url, True), x, y, width=QRCodeSize, height=QRCodeSize)
-        c.setFont("NettoVDR", fontSize)
         
-        wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry
-        yText = y
-        
-        for line in wLines:
-            c.drawCentredString(x + 30*mm, yText, line)
-            yText -= fontSize
-        
-        if is_eq_csv:
-            c.drawCentredString(x + 30*mm, yText, f"{row["Modèle"]} {row["Code matériel"]}")
-        else:
-            c.drawCentredString(x + 30*mm, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
+        drawText(c, row, x, 30*mm, y, fontSize, charsPerLine, is_eq_csv)
         
         count += 1
         y = yStart - (count // 3) * 70 * mm   # (count // 3) is the line number we're on
@@ -261,3 +213,29 @@ def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
         qr_code.paste(LOGO, pos, LOGO)
     
     return ImageReader(qr_code)
+
+
+def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: int, charsPerLine: int, is_eq_csv: bool) -> float:
+    c.setFont("NettoVDR", fontSize)    
+    wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry
+        
+    for line in wLines:
+        c.drawCentredString(x + x_margin, yText, line)
+        yText -= fontSize
+        
+    if is_eq_csv:
+        c.drawCentredString(x + x_margin, yText, f"{row["Modèle"]} {row["Code matériel"]}")
+    else:
+        c.drawCentredString(x + x_margin, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
+    
+    return yText
+
+def updateProgressBar(index: int, entries: pd.DataFrame, url: str, progressBar: ProgressBarState):
+    value = round(100 * cast(int, index) / entries.shape[0])
+    print(value)
+    
+    progressBar.label.setText(url)
+    progressBar.progressBar.setValue(value)
+    
+    QCoreApplication.processEvents()                # keep ui responsive by processing events
+    
