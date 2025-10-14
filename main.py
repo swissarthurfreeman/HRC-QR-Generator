@@ -6,10 +6,11 @@ from collections.abc import Callable
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QFileDialog, QWidget, QScrollArea, QPushButton, QHBoxLayout, QProgressBar, QLineEdit
 )
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QFontDatabase, QFont
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
+
 
 myappid = 'hrc.exploitation-si.genqr' # arbitrary string
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
@@ -42,19 +43,31 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowIcon(QIcon("./assets/hrc-logo-simplified.png"))
+        
+        self.NettoOffcFamily: str = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont("./assets/NettoOffc.ttf"))[0]
+        self.NettoOffcBoldFamily: str = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont("./assets/NettoOffc-Bold.ttf"))[0]
+        
+        self.wFont = QFont()
+        #self.wFont.setPointSize
+        self.wFont.setFamily(self.NettoOffcBoldFamily)
+        self.setFont(self.wFont)
+        self.setStyleSheet("font-size: 14px;")
+        
         self.reset()
     
     def reset(self):
         self.generationConfig: GenerationConfig = GenerationConfig.default()          # configuration of PDF generation, contains PDF function, qr code format and rows associations.
         
-        self.setWindowTitle("Générateur de QR codes de l'informatique HRC")
+        self.setWindowTitle("Générateur de QR codes — C-Exploitation SI")
+        
         self.setGeometry(100, 100, 1200, 600)
 
         self.central_widget: QWidget = QWidget()                     # superclass of Qt elements (button, dropdown, labels...) allows placing, handle clicks, dropdowns etc.                  
         self.setCentralWidget(self.central_widget)                   # parent widget of the app
         self.layout: QVBoxLayout = QVBoxLayout(self.central_widget)  # https://doc.qt.io/qt-6/qvboxlayout.html#details, construct vertical box layout objects
         
-        self.drop_label = QLabel("Glisser et déposer un fichier CSV ici ou clickez afin d'en séléctionner un.") 
+        self.drop_label = QLabel("Glisser et déposer un fichier CSV ici ou clickez afin d'en séléctionner un.")
+        self.drop_label.setFont(QFont(self.NettoOffcBoldFamily)) 
         self.drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)                  # Drag-and-drop area, just a dashed line framed label https://doc.qt.io/qt-6/qlabel.html
         self.drop_label.setStyleSheet("border: 2px dashed #aaa; padding: 100px; font-size: 24px; font-weight: bold;")    
         self.drop_label.mousePressEvent = self.open_file_dialog # type: ignore
@@ -90,7 +103,7 @@ class MainWindow(QMainWindow):
         
     
     def open_file_dialog(self, event=None):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Séléctionner le CSV d'inventaire EasyVista", "", "CSV Files (*.csv)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Séléctionner un CSV d'inventaire", "", "CSV Files (*.csv)")
         if file_path:
             self.process_csv(file_path)
 
@@ -118,7 +131,7 @@ class MainWindow(QMainWindow):
         self.generate_button.setFixedWidth(100)
         self.generate_button.clicked.connect(self.on_generate_clicked)
         
-        self.current_url = QLabel("https://...")                        # label to display current URL being processed.
+        self.current_url = QLabel("")                        # label to display current URL being processed.
         self.current_url.setAlignment(Qt.AlignmentFlag.AlignRight)
         
         self.gen_curr_url_layout = QHBoxLayout()
