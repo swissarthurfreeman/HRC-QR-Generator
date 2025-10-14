@@ -76,8 +76,8 @@ class MainWindow(QMainWindow):
 
         self.caption_hlayout = QHBoxLayout()                # qr code caption text edit
         self.caption_edit_text = QLineEdit("Signaler un problème en scannant le QR code avec votre téléphone HRC.")
-        self.caption_edit_text.setMaxLength(90)
-        self.caption_edit_text.setFixedWidth(500)
+        self.caption_edit_text.setMaxLength(120)
+        self.caption_edit_text.setFixedWidth(550)
         self.caption_edit_text.setVisible(False)
         
         self.caption_edit_title = QLabel("Texte de QR code")

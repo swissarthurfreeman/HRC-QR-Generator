@@ -73,7 +73,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
         
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
         
-        drawText(c, row, x, QRCodeSize / 2, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize - 10 * mm, fontSize)
+        drawText(c, row, x, QRCodeSize / 2, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize - 10 * mm, fontSize, max_lines=2)
         
         count += 1
         
@@ -112,7 +112,7 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
         
         
-        yText = drawText(c, row, x, 27*mm, y - fontSize, fontSize, charsPerLine, is_eq_csv, qrCaption, HRC_LOGO_WIDTH - 10 * mm, fontSize)
+        yText = drawText(c, row, x, 27*mm, y - fontSize, fontSize, charsPerLine, is_eq_csv, qrCaption, HRC_LOGO_WIDTH - 10 * mm, fontSize, max_lines=3)
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
         y = yText - 3 * mm
@@ -146,7 +146,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     print("genSmallSquareQRPDFsFor")
     QRCodeSize = 60 * mm
     width, height = A4
-    fontSize, charsPerLine = 10, 36
+    fontSize, charsPerLine = 10, 40
     xStart, yStart = 2.5 * mm, height - 10 * mm - 58 * mm                                       # top-margin minus 5 height of sticker square (Zweckform 3661)
     x, y = xStart, yStart
     
@@ -160,7 +160,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
         
         c.drawImage(getQRImageReaderFromRow(url, True), x, y, width=QRCodeSize, height=QRCodeSize)
         
-        drawText(c, row, x, 30*mm, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize, fontSize)
+        drawText(c, row, x, 30*mm, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize, fontSize, max_lines=2)
         
         count += 1
         y = yStart - (count // 3) * 70 * mm   # (count // 3) is the line number we're on
@@ -200,19 +200,38 @@ def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
     
     return ImageReader(qr_code)
 
+# we need the min max wrap width such as no fucking [...] is inserted.
 
-def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: float, charsPerLine: int, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float) -> float:
+def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
+    width = len("[...]")
+    while True:
+        wLines = textwrap.wrap(text, width=width, max_lines=max_lines)
+        print(wLines, width)
+        if wLines[-1].find("[...]") == -1:
+            return width
+        else:
+            width += 1
+
+def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: float, charsPerLine: int, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int) -> float:
     pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
     pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
-    c.setFont("NettoVDR", fontSize)    
-    wLines: list[str] = textwrap.wrap(qrCaption, width=charsPerLine, max_lines=3)               # "wrap" caption to array of strings of max chars per entry
+    
+    optimalLineWidth = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines)
+    wLines: list[str] = textwrap.wrap(qrCaption, width=optimalLineWidth, max_lines=max_lines)
+    
+    line_lengths = [len(line) for line in wLines]
+    idx = line_lengths.index(max(line_lengths))
+    
+    fontSize = fit_text_to_width(wLines[idx], "NettoVDR", max_width=maxTextWidth, max_font_size=maxFontSize)
+    
+    c.setFont("NettoVDR", fontSize)   
+    # textwrap.wrap(qrCaption, width=charsPerLine, max_lines=max_lines, break_long_words=True)               # "wrap" caption to array of strings of max chars per entry
     
     for line in wLines:
         c.drawCentredString(x + x_margin, yText, line)
         yText -= fontSize
     
     modCodeMat = f"{row["Modèle"]} {row["Code matériel"]}"
-    fontSize = fit_text_to_width(modCodeMat, "NettoVDR", max_width=maxTextWidth, max_font_size=maxFontSize)
     
     c.setFont("NettoBold", fontSize)
     if is_eq_csv:
@@ -221,6 +240,14 @@ def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText:
         c.drawCentredString(x + x_margin, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
     
     return yText
+
+def split_string_at_middle(text: str) -> list[str]:
+    lhalf, rhalf = text[:len(text) // 2], text[(len(text) // 2):]
+    
+    if lhalf[-1] == " " or rhalf[0] == " ": 
+        return [lhalf, rhalf]
+    else:
+        return [lhalf + "-", rhalf]
 
 def updateProgressBar(index: int, entries: pd.DataFrame, url: str, progressBar: ProgressBarState):
     value = round(100 * cast(int, index) / entries.shape[0])
