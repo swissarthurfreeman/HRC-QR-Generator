@@ -10,6 +10,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 from qrcode.image.styledpil import StyledPilImage
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 from qrcode.image.styles.colormasks import SolidFillColorMask
 
@@ -24,7 +25,6 @@ class ProgressBarState:     # state is set by main window when a file is loaded.
         self.label: QLabel = label
 
 
-QR_CODE_CAPTION = "Scannez le QR code avec votre télphone HRC afin de signaler un problème."
 HRC_LOGO_WIDTH = 62 * mm
 HRC_LOGO_HEIGHT = 24 * mm
 
@@ -45,7 +45,7 @@ def getUrlFrom(row: pd.Series):
     return "https://apps-hrc.adi.adies.lan/mailer/new-ticket?" + encoded_query
 
 
-def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf"): 
+def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf", qrCaption: str = ""): 
     progressBar.progressBar.setValue(0)
     
     print("genLargeVerticalQRPDFsFor")
@@ -53,7 +53,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     width, height = A4
     fontSize, charsPerLine = 16, 40
     
-    xStart, yStart = 15 * mm, height - 35 * mm
+    xStart, yStart = 15 * mm, height - 33 * mm
     x, y = xStart, yStart
     
     c = canvas.Canvas(outputPath + "/largeVerticalQRs.pdf", pagesize=A4)
@@ -73,7 +73,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
         
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
         
-        drawText(c, row, x, QRCodeSize / 2, y, fontSize, charsPerLine, is_eq_csv)
+        drawText(c, row, x, QRCodeSize / 2, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize - 10 * mm, fontSize)
         
         count += 1
         
@@ -84,7 +84,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
         else:
             # manually hardcore all QR code positions (coded to fit to a 3483 sticker sheet)
             if count == 1:
-                x, y = 119 * mm, height - 35 * mm
+                x, y = 119 * mm, yStart
             elif count == 2:
                 x, y = 15 * mm, height - 182 * mm
             elif count == 3:
@@ -95,7 +95,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     print(f"LOG: PDF saved as: {outputPath}")
 
 
-def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/mediumHoriQRs.pdf"): # entries (code, model, image)
+def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/mediumHoriQRs.pdf", qrCaption: str = ""): # entries (code, model, image)
     progressBar.progressBar.setValue(0)
     
     print("genMediumHorizontalQRPDFsFor")
@@ -112,14 +112,12 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
         
         
-        yText = drawText(c, row, x, 27*mm, y - fontSize, fontSize, charsPerLine, is_eq_csv)
+        yText = drawText(c, row, x, 27*mm, y - fontSize, fontSize, charsPerLine, is_eq_csv, qrCaption, HRC_LOGO_WIDTH - 10 * mm, fontSize)
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
-        y = yText - 5*mm
+        y = yText - 3 * mm
         
         url = getUrlFrom(row)
-        
-        
         updateProgressBar(index, entries, url, progressBar)
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)
         
@@ -142,14 +140,14 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     print(f"LOG: PDF saved as :{outputPath}")   
 
 
-def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf"):
+def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf", qrCaption: str = ""):
     progressBar.progressBar.setValue(0)
     
     print("genSmallSquareQRPDFsFor")
     QRCodeSize = 60 * mm
     width, height = A4
-    fontSize, charsPerLine = 9, 36
-    xStart, yStart = 2.5 * mm, height - 13 * mm - 58 * mm                                       # top-margin minus 5 height of sticker square (Zweckform 3661)
+    fontSize, charsPerLine = 10, 36
+    xStart, yStart = 2.5 * mm, height - 10 * mm - 58 * mm                                       # top-margin minus 5 height of sticker square (Zweckform 3661)
     x, y = xStart, yStart
     
     c = canvas.Canvas(outputPath + "/smallSquareQRs.pdf", pagesize=A4)
@@ -162,7 +160,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
         
         c.drawImage(getQRImageReaderFromRow(url, True), x, y, width=QRCodeSize, height=QRCodeSize)
         
-        drawText(c, row, x, 30*mm, y, fontSize, charsPerLine, is_eq_csv)
+        drawText(c, row, x, 30*mm, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize, fontSize)
         
         count += 1
         y = yStart - (count // 3) * 70 * mm   # (count // 3) is the line number we're on
@@ -203,19 +201,22 @@ def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
     return ImageReader(qr_code)
 
 
-def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: int, charsPerLine: int, is_eq_csv: bool) -> float:
+def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: float, charsPerLine: int, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float) -> float:
     pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
     pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
     c.setFont("NettoVDR", fontSize)    
-    wLines: list[str] = textwrap.wrap(QR_CODE_CAPTION, width=charsPerLine)               # "wrap" caption to array of strings of max chars per entry
-        
+    wLines: list[str] = textwrap.wrap(qrCaption, width=charsPerLine, max_lines=3)               # "wrap" caption to array of strings of max chars per entry
+    
     for line in wLines:
         c.drawCentredString(x + x_margin, yText, line)
         yText -= fontSize
     
+    modCodeMat = f"{row["Modèle"]} {row["Code matériel"]}"
+    fontSize = fit_text_to_width(modCodeMat, "NettoVDR", max_width=maxTextWidth, max_font_size=maxFontSize)
+    
     c.setFont("NettoBold", fontSize)
     if is_eq_csv:
-        c.drawCentredString(x + x_margin, yText, f"{row["Modèle"]} {row["Code matériel"]}")
+        c.drawCentredString(x + x_margin, yText, modCodeMat)
     else:
         c.drawCentredString(x + x_margin, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
     
@@ -230,3 +231,25 @@ def updateProgressBar(index: int, entries: pd.DataFrame, url: str, progressBar: 
     
     QCoreApplication.processEvents()                # keep ui responsive by processing events
     
+
+def fit_text_to_width(text, font_name="Helvetica", max_width: float=200, max_font_size: float=20, min_font_size=4):
+    """
+    Find the largest font size such that `text` fits in `max_width`.
+
+    Args:
+        text (str): The text to fit.
+        font_name (str): The ReportLab font name.
+        max_width (float): Maximum allowed width (in points).
+        max_font_size (float): Upper bound of font size search.
+        min_font_size (float): Lower bound of font size search.
+
+    Returns:
+        float: The best font size fitting in max_width.
+    """
+    font_size = max_font_size
+    while font_size >= min_font_size:
+        text_width = stringWidth(text, font_name, font_size)
+        if text_width <= max_width:
+            return float(font_size)
+        font_size -= 0.5  # decrease gradually (can also use binary search for speed)
+    return float(min_font_size)

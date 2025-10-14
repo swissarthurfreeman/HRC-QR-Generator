@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from collections.abc import Callable
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QFileDialog, QWidget, QScrollArea, QPushButton, QHBoxLayout, QProgressBar
+    QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QFileDialog, QWidget, QScrollArea, QPushButton, QHBoxLayout, QProgressBar, QLineEdit
 )
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QUrl
@@ -15,9 +15,9 @@ myappid = 'hrc.exploitation-si.genqr' # arbitrary string
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 class QRCodeFormat:
-    def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState, str], None]):
+    def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState, str, str], None]):
         self.description = description
-        self.generatePDFsFunc: Callable[[bool, pd.DataFrame, ProgressBarState, str], None] = func
+        self.generatePDFsFunc: Callable[[bool, pd.DataFrame, ProgressBarState, str, str], None] = func
         self.models: list[str] = []                     # used to filter rows from CSV.
 
 class GenerationConfig:
@@ -53,7 +53,6 @@ class MainWindow(QMainWindow):
         self.central_widget: QWidget = QWidget()                     # superclass of Qt elements (button, dropdown, labels...) allows placing, handle clicks, dropdowns etc.                  
         self.setCentralWidget(self.central_widget)                   # parent widget of the app
         self.layout: QVBoxLayout = QVBoxLayout(self.central_widget)  # https://doc.qt.io/qt-6/qvboxlayout.html#details, construct vertical box layout objects
-
         
         self.drop_label = QLabel("Glisser et déposer un fichier CSV ici ou clickez afin d'en séléctionner un.") 
         self.drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)                  # Drag-and-drop area, just a dashed line framed label https://doc.qt.io/qt-6/qlabel.html
@@ -61,6 +60,21 @@ class MainWindow(QMainWindow):
         self.drop_label.mousePressEvent = self.open_file_dialog # type: ignore
         self.layout.addWidget(self.drop_label)                                      # add the label to the Vertical Layout (drag and drop field | list of models title | list of dropdown selects)
 
+
+        self.caption_hlayout = QHBoxLayout()                # qr code caption text edit
+        self.caption_edit_text = QLineEdit("Signaler un problème en scannant le QR code avec votre téléphone HRC.")
+        self.caption_edit_text.setMaxLength(90)
+        self.caption_edit_text.setFixedWidth(500)
+        self.caption_edit_text.setVisible(False)
+        
+        self.caption_edit_title = QLabel("Texte de QR code")
+        self.caption_edit_title.setVisible(False)
+        
+        self.caption_hlayout.addWidget(self.caption_edit_title)
+        self.caption_hlayout.addWidget(self.caption_edit_text)
+        self.caption_hlayout.setContentsMargins(0, 0, 700, 0)
+        self.layout.addLayout(self.caption_hlayout)
+        
         self.scroll_area = QScrollArea()                            # model list Scrollable area, displays contents of child widget in frame https://doc.qt.io/qt-6/qscrollarea.html#details
         self.scroll_area.setWidgetResizable(True)                   # if widget exceeds size of frame, view provides scroll bars.
         self.scroll_content = QWidget()
@@ -190,6 +204,8 @@ class MainWindow(QMainWindow):
             
         self.drop_label.setVisible(False)
         self.setAcceptDrops(False)
+        self.caption_edit_title.setVisible(True)
+        self.caption_edit_text.setVisible(True)
         self.scroll_area.setVisible(True)
 
     def getOutputFolderTimeStampName(self) -> str:
@@ -200,7 +216,8 @@ class MainWindow(QMainWindow):
         """Read the dropdown values, associate models to QR code formats, call the PDF generation functions."""
         self.generationConfig: GenerationConfig = GenerationConfig.default()            # reset config back to default
         output_path = f"./output/{self.getOutputFolderTimeStampName()}/"
-                
+        qrCaption = self.caption_edit_text.text()
+        
         pgBar = ProgressBarState(self.progress, self.current_url)                 # initialize progress bar state
         if self.is_eq_csv:                                          # if we're dealing with equipments list (no model column)
             for i in range(1, self.scroll_layout.count()):
@@ -223,15 +240,14 @@ class MainWindow(QMainWindow):
                     os.makedirs(output_path + category, exist_ok=True, mode=777)
                     rowsWFormatAndCategory = rowsWFormat[rowsWFormat['Catégorie'] == category]  # select all equipments with current format of that category, save pdfs in ./output/category/format.pdf  
                     
-                    self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, rowsWFormatAndCategory, pgBar, output_path + category)    # self.progressBarState initialized in addGenerateButtonAndLoadingBar
+                    self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, rowsWFormatAndCategory, pgBar, output_path + category, qrCaption)    # self.progressBarState initialized in addGenerateButtonAndLoadingBar
                 
         else:
-            
             qrFormat = self.scroll_layout.itemAt(1).itemAt(3).widget().currentText()                       # type: ignore retrive the selected qr format for meeting rooms csv (only one model)
-            self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar, output_path + "Salle de Réunion")   # call generate QR codes for meeting rooms.
+            os.makedirs(output_path + "Salle de Réunion", exist_ok=True, mode=777)
+            self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar, output_path + "Salle de Réunion", qrCaption)   # call generate QR codes for meeting rooms.
         
-        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath("output")))         # open explorer window at place where PDFs were saved.
-        
+        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(output_path)))         # open explorer window at place where PDFs were saved.
         self.reset()
                     
     def col_contains_blanks(self, col: pd.Series) -> bool:
