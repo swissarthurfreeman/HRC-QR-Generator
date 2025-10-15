@@ -45,13 +45,12 @@ def getUrlFrom(row: pd.Series):
     return "https://apps-hrc.adi.adies.lan/mailer/new-ticket?" + encoded_query
 
 
-def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf", qrCaption: str = ""): 
+def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str): 
     progressBar.progressBar.setValue(0)
     
     print("genLargeVerticalQRPDFsFor")
     QRCodeSize = 100 * mm
     width, height = A4
-    fontSize, charsPerLine = 16, 40
     
     xStart, yStart = 15 * mm, height - 33 * mm
     x, y = xStart, yStart
@@ -73,7 +72,7 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
         
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
         
-        drawText(c, row, x, QRCodeSize / 2, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize - 10 * mm, fontSize, max_lines=2)
+        drawText(c=c, row=row, x=x + QRCodeSize / 2, yText=y, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=QRCodeSize - 10 * mm, maxFontSize=16, max_lines=2)
         
         count += 1
         
@@ -95,15 +94,15 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     print(f"LOG: PDF saved as: {outputPath}")
 
 
-def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/mediumHoriQRs.pdf", qrCaption: str = ""): # entries (code, model, image)
+def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str): # entries (code, model, image)
     progressBar.progressBar.setValue(0)
     
     print("genMediumHorizontalQRPDFsFor")
     QRCodeSize = 44 * mm
     width, height = A4
-    fontSize, charsPerLine = 12, 30
-    xStart, yStart = 3 * mm, height - 28 * mm
+    xStart, yStart = 3 * mm, height - 26 * mm
     x, y = xStart, yStart
+    maxFontSize = 12
     
     c = canvas.Canvas(outputPath + "/mediumHoriQRs.pdf", pagesize=A4)
     
@@ -112,7 +111,7 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
         
         
-        yText = drawText(c, row, x, 27*mm, y - fontSize, fontSize, charsPerLine, is_eq_csv, qrCaption, HRC_LOGO_WIDTH - 10 * mm, fontSize, max_lines=3)
+        yText = drawText(c=c, row=row, x=x + 27*mm, yText=y - maxFontSize, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=HRC_LOGO_WIDTH - 10 * mm, maxFontSize=maxFontSize, max_lines=3)
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
         y = yText - 3 * mm
@@ -140,13 +139,12 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     print(f"LOG: PDF saved as :{outputPath}")   
 
 
-def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str = "./output/largeVerticalQRs.pdf", qrCaption: str = ""):
+def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str):
     progressBar.progressBar.setValue(0)
     
     print("genSmallSquareQRPDFsFor")
     QRCodeSize = 60 * mm
     width, height = A4
-    fontSize, charsPerLine = 10, 40
     xStart, yStart = 2.5 * mm, height - 10 * mm - 58 * mm                                       # top-margin minus 5 height of sticker square (Zweckform 3661)
     x, y = xStart, yStart
     
@@ -160,7 +158,7 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
         
         c.drawImage(getQRImageReaderFromRow(url, True), x, y, width=QRCodeSize, height=QRCodeSize)
         
-        drawText(c, row, x, 30*mm, y, fontSize, charsPerLine, is_eq_csv, qrCaption, QRCodeSize, fontSize, max_lines=2)
+        drawText(c=c, row=row, x=x + 30*mm, yText=y, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=QRCodeSize, maxFontSize=10, max_lines=2)
         
         count += 1
         y = yStart - (count // 3) * 70 * mm   # (count // 3) is the line number we're on
@@ -200,9 +198,12 @@ def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
     
     return ImageReader(qr_code)
 
-# we need the min max wrap width such as no fucking [...] is inserted.
 
 def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
+    """
+    Retrieve the smallest largest text width such as no [...] placeholder
+    is inserted in the text wrap. 
+    """
     width = len("[...]")
     while True:
         wLines = textwrap.wrap(text, width=width, max_lines=max_lines)
@@ -212,33 +213,37 @@ def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
         else:
             width += 1
 
-def drawText(c: canvas.Canvas, row: pd.Series, x: float, x_margin: float, yText: float, fontSize: float, charsPerLine: int, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int) -> float:
+
+def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int) -> float:
+    """
+    Draw provided text `qrCaption` centered at position x starting at height `yText`. `qrCaption` will be wrapped to a max of `max_lines` and it's 
+    font size will be computed such as the longest wrapped line doesn't exceed `maxTextWidth` and is of maximum font size `maxFontSize`. `row` will 
+    be used to write either **row[Modèle] row[Code matériel]** as last line or **Salle de Réunion row[Numéro de Signalétique] row[Localisation]**
+    depending on `is_eq_csv`.
+    """
     pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
     pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
     
     optimalLineWidth = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines)
-    wLines: list[str] = textwrap.wrap(qrCaption, width=optimalLineWidth, max_lines=max_lines)
+    wLines: list[str] = textwrap.wrap(qrCaption, width=optimalLineWidth, max_lines=max_lines)   # wrap lines to max_lines
+    wLines.append(
+        f"{row["Modèle"]} {row["Code matériel"]}" if is_eq_csv else 
+        f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}"
+    )
     
     line_lengths = [len(line) for line in wLines]
-    idx = line_lengths.index(max(line_lengths))
+    idx = line_lengths.index(max(line_lengths))         # get index of longest line
     
-    fontSize = fit_text_to_width(wLines[idx], "NettoVDR", max_width=maxTextWidth, max_font_size=maxFontSize)
+    fontSize = fit_text_to_width(wLines[idx], "NettoVDR", max_width=maxTextWidth, max_font_size=maxFontSize)    # get appropriate fontsize to fit the longest line
     
     c.setFont("NettoVDR", fontSize)   
-    # textwrap.wrap(qrCaption, width=charsPerLine, max_lines=max_lines, break_long_words=True)               # "wrap" caption to array of strings of max chars per entry
     
-    for line in wLines:
-        c.drawCentredString(x + x_margin, yText, line)
+    for line in wLines[:-1]:
+        c.drawCentredString(x, yText, line)
         yText -= fontSize
     
-    modCodeMat = f"{row["Modèle"]} {row["Code matériel"]}"
-    
     c.setFont("NettoBold", fontSize)
-    if is_eq_csv:
-        c.drawCentredString(x + x_margin, yText, modCodeMat)
-    else:
-        c.drawCentredString(x + x_margin, yText, f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}")
-    
+    c.drawCentredString(x, yText, wLines[-1])           # draw equipment or meeting room info in bold.
     return yText
 
 def split_string_at_middle(text: str) -> list[str]:
