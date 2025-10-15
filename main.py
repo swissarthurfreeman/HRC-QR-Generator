@@ -12,14 +12,15 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
 
 
-myappid = 'hrc.exploitation-si.genqr' # arbitrary string
-ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('hrc.exploitation-si.genqr')
+
 
 class QRCodeFormat:
     def __init__(self, description, func: Callable[[bool, pd.DataFrame, ProgressBarState, str, str], None]):
         self.description = description
         self.generatePDFsFunc: Callable[[bool, pd.DataFrame, ProgressBarState, str, str], None] = func
         self.models: list[str] = []                     # used to filter rows from CSV.
+
 
 class GenerationConfig:
     def __init__(self, qrFormats: list[QRCodeFormat]):
@@ -55,6 +56,7 @@ class MainWindow(QMainWindow):
         
         self.reset()
     
+
     def reset(self):
         self.generationConfig: GenerationConfig = GenerationConfig.default()          # configuration of PDF generation, contains PDF function, qr code format and rows associations.
         
@@ -107,6 +109,7 @@ class MainWindow(QMainWindow):
         if file_path:
             self.process_csv(file_path)
 
+
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Fired when a file is dragged over the screen. If it's a CSV file we accept it can be dropped, otherwise ignore."""
         if event.mimeData().hasUrls() and event.mimeData().urls()[0].toLocalFile().endswith(".csv"):    # type: ignore urls is an array [file://PATH_TO_DROPPED_FILE] of size 1.
@@ -114,6 +117,7 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()
     
+
     def dropEvent(self, event: QDropEvent):
         """Fired when a file is dropped into the window, file is checked if .csv in @dragEnterEvent"""
         file_path = event.mimeData().urls()[0].toLocalFile()        # type: ignore urls is an array [file://PATH_TO_DROPPED_FILE] of size 1.
@@ -126,6 +130,7 @@ class MainWindow(QMainWindow):
             wrapped_text = "\n".join([text[i:i+70] for i in range(0, len(text), 70)])
             self.drop_label.setText(wrapped_text)
         
+
     def addGenerateButtonAndLoadingBar(self):
         self.generate_button = QPushButton("Générer!")                  # configure generation button.
         self.generate_button.setFixedWidth(100)
@@ -146,6 +151,7 @@ class MainWindow(QMainWindow):
         
         self.layout.addWidget(self.progress)
         
+
     def read_and_validate_csv(self, file_path):
         """Read and validate CSV file. Expects a non empty utf-8 file containing either `eq_mand_cols` or `room_mand_cols` defined 
         in the constructor. Equipments: `Numéro de Série, Code matériel, Modèle, Catégorie`, Meeting rooms: `Numéro de 
@@ -167,6 +173,7 @@ class MainWindow(QMainWindow):
         if self.csv_df.shape[0] == 0: 
             raise Exception("Aucun équipement présent dans le fichier.")
             
+
     def process_csv(self, file_path):
         """Read CSV file at @param file_path, check Modèle and Code Matériel column is provided.
         If 'Numéro de Série' is provided, it'll be used in the encoded URLs, but it's not mandatory.
@@ -184,6 +191,7 @@ class MainWindow(QMainWindow):
         
         self.populate_model_list()
     
+
     def populate_model_list(self):
         title_label = QLabel("Veuillez Choisir le format de QR code par Modèle d'Équipement" if self.is_eq_csv else "Choissisez le format de QR code")
         title_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)  # Align inside the label
@@ -221,9 +229,11 @@ class MainWindow(QMainWindow):
         self.caption_edit_text.setVisible(True)
         self.scroll_area.setVisible(True)
 
+
     def getOutputFolderTimeStampName(self) -> str:
         folder = str(datetime.now()).replace(":", "").replace(" ", "-")
         return folder[:folder.find(".")]
+
 
     def on_generate_clicked(self, _):
         """Read the dropdown values, associate models to QR code formats, call the PDF generation functions."""
@@ -266,12 +276,14 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(output_path)))         # open explorer window at place where PDFs were saved.
         self.reset()
                     
+
     def col_contains_blanks(self, col: pd.Series) -> bool:
         return col.isna().any() or col.astype(str).str.strip().eq("").any()
     
+
     def remove_model(self, model, layout):
         """Remove a specific model from the list."""
-        for i in reversed(range(layout.count())):           # TODO : understand this code
+        for i in reversed(range(layout.count())):
             layout.itemAt(i).widget().deleteLater()
         self.scroll_layout.removeItem(layout)
 

@@ -19,20 +19,23 @@ from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_H
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtWidgets import QProgressBar, QProgressBar, QLabel
 
+
 class ProgressBarState:     # state is set by main window when a file is loaded.
     def __init__(self, progressBar: QProgressBar, label: QLabel):
         self.progressBar: QProgressBar = progressBar
         self.label: QLabel = label
 
 
-HRC_LOGO_WIDTH = 62 * mm
-HRC_LOGO_HEIGHT = 24 * mm
+HRC_LOGO_WIDTH, HRC_LOGO_HEIGHT = 62 * mm, 24 * mm
 
 LOGO = Image.open("./assets/hrc-logo-simplified.png").convert("RGBA")
 LOGO_SIZE_RATIO: float = 0.3
-LOGO_WIDTH, LOGO_HEIGHT = LOGO.size
-LOGO_WIDTH, LOGO_HEIGHT = int(LOGO_WIDTH*LOGO_SIZE_RATIO), int(LOGO_HEIGHT*LOGO_SIZE_RATIO)
+LOGO_WIDTH, LOGO_HEIGHT = int(LOGO.size[0] * LOGO_SIZE_RATIO), int(LOGO.size[1] * LOGO_SIZE_RATIO)
 LOGO = LOGO.resize((LOGO_WIDTH, LOGO_HEIGHT))
+OPTIMAL_LINE_WIDTH = None
+
+pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
+pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
 
 
 def getUrlFrom(row: pd.Series):
@@ -207,7 +210,6 @@ def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
     width = len("[...]")
     while True:
         wLines = textwrap.wrap(text, width=width, max_lines=max_lines)
-        print(wLines, width)
         if wLines[-1].find("[...]") == -1:
             return width
         else:
@@ -221,11 +223,13 @@ def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv
     be used to write either **row[Modèle] row[Code matériel]** as last line or **Salle de Réunion row[Numéro de Signalétique] row[Localisation]**
     depending on `is_eq_csv`.
     """
-    pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
-    pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
+    global OPTIMAL_LINE_WIDTH   # this avoids recomputing it at every call to drawText()
     
-    optimalLineWidth = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines)
-    wLines: list[str] = textwrap.wrap(qrCaption, width=optimalLineWidth, max_lines=max_lines)   # wrap lines to max_lines
+    #optimalLineWidth = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines)
+    
+    OPTIMAL_LINE_WIDTH = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines) if OPTIMAL_LINE_WIDTH == None else OPTIMAL_LINE_WIDTH
+    
+    wLines: list[str] = textwrap.wrap(qrCaption, width=OPTIMAL_LINE_WIDTH, max_lines=max_lines)   # wrap lines to max_lines
     wLines.append(
         f"{row["Modèle"]} {row["Code matériel"]}" if is_eq_csv else 
         f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}"
@@ -256,11 +260,8 @@ def split_string_at_middle(text: str) -> list[str]:
 
 def updateProgressBar(index: int, entries: pd.DataFrame, url: str, progressBar: ProgressBarState):
     value = round(100 * cast(int, index) / entries.shape[0])
-    print(value)
-    
     progressBar.label.setText(url)
     progressBar.progressBar.setValue(value)
-    
     QCoreApplication.processEvents()                # keep ui responsive by processing events
     
 
