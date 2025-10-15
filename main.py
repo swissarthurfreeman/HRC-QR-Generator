@@ -232,16 +232,18 @@ class MainWindow(QMainWindow):
         qrCaption = self.caption_edit_text.text()
         
         pgBar = ProgressBarState(self.progress, self.current_url)                 # initialize progress bar state
+        self.generate_button.setEnabled(False)
+        self.caption_edit_text.setEnabled(False)
+        for i in range(1, self.scroll_layout.count()):
+            self.scroll_layout.itemAt(i).itemAt(3).widget().setEnabled(False)           # type: ignore
+            self.scroll_layout.itemAt(i).itemAt(0).widget().setEnabled(False)           # type: ignore
+        
         if self.is_eq_csv:                                          # if we're dealing with equipments list (no model column)
             for i in range(1, self.scroll_layout.count()):
                 qrFormat = self.scroll_layout.itemAt(i).itemAt(3).widget().currentText()    # type: ignore
                 model = self.scroll_layout.itemAt(i).itemAt(1).widget().text()              # type: ignore
                 
                 self.generationConfig.formats[qrFormat].models.append(model)
-                
-                self.scroll_layout.itemAt(i).itemAt(3).widget().setEnabled(False)           # type: ignore
-                self.scroll_layout.itemAt(i).itemAt(0).widget().setEnabled(False)           # type: ignore
-                self.generate_button.setEnabled(False)
                 
             for qrFormat in self.generationConfig.formats:                      # filter to only rows matching the selected models for this format and generate PDFs
                 rowsWFormat = self.csv_df[self.csv_df['Modèle'].isin(self.generationConfig.formats[qrFormat].models)]
@@ -257,6 +259,7 @@ class MainWindow(QMainWindow):
                 
         else:
             qrFormat = self.scroll_layout.itemAt(1).itemAt(3).widget().currentText()                       # type: ignore retrive the selected qr format for meeting rooms csv (only one model)
+            
             os.makedirs(output_path + "Salle de Réunion", exist_ok=True, mode=777)
             self.generationConfig.formats[qrFormat].generatePDFsFunc(self.is_eq_csv, self.csv_df, pgBar, output_path + "Salle de Réunion", qrCaption)   # call generate QR codes for meeting rooms.
         
