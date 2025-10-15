@@ -30,13 +30,12 @@ class ProgressBarState:     # state is set by main window when a file is loaded.
         self.label: QLabel = label
 
 
-HRC_LOGO_WIDTH, HRC_LOGO_HEIGHT = 62 * mm, 24 * mm
+HRC_LOGO_WIDTH, HRC_LOGO_HEIGHT = 62 * mm, 24 * mm                      # official HRC logo parameters
 
-LOGO = Image.open("./assets/hrc-logo-simplified.png").convert("RGBA")
+LOGO = Image.open("./assets/hrc-logo-simplified.png").convert("RGBA")   # simplified HRC logo parameters
 LOGO_SIZE_RATIO: float = 0.3
 LOGO_WIDTH, LOGO_HEIGHT = int(LOGO.size[0] * LOGO_SIZE_RATIO), int(LOGO.size[1] * LOGO_SIZE_RATIO)
 LOGO = LOGO.resize((LOGO_WIDTH, LOGO_HEIGHT))
-OPTIMAL_LINE_WIDTH = None
 
 pdfmetrics.registerFont(TTFont('NettoVDR', './assets/NettoOffc.ttf'))
 pdfmetrics.registerFont(TTFont('NettoBold', './assets/NettoOffc-Bold.ttf'))
@@ -129,7 +128,7 @@ def genPDFsWithAveryZweckform3424Format(is_eq_csv: bool, entries: pd.DataFrame, 
         
         count += 1
         
-        y = yStart - (count // 2) * 49 * mm   # (count // 2) is the line number we're on
+        y = yStart - (count // 2) * 50 * mm   # (count // 2) is the line number we're on
         
         if count % 2 != 0:          # i.e. we're in the second column
             x = 105*mm + xStart     # middle point + margin
@@ -218,7 +217,6 @@ def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
         else:
             width += 1
 
-MAX_LINES = None
 
 def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int) -> float:
     """
