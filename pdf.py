@@ -1,23 +1,27 @@
+##############################################################################
+# A. Freeman 15/10/2024                         swissarthurfreeman@gmail.com #
+# reportlab/python-qrcode based functions to generate PDFs following Avery   #
+# Zweckform formats 3424, 3483 3661.                                         #
+##############################################################################
 import qrcode
 import textwrap
 import pandas as pd
+from PIL import Image
 from typing import cast
 from urllib.parse import urlencode
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from PyQt6.QtCore import QCoreApplication
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.ttfonts import TTFont
+from qrcode.constants import ERROR_CORRECT_L
 from qrcode.image.styledpil import StyledPilImage
 from reportlab.pdfbase.pdfmetrics import stringWidth
-from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 from qrcode.image.styles.colormasks import SolidFillColorMask
-
-from PIL import Image
-from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_H
-from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtWidgets import QProgressBar, QProgressBar, QLabel
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 
 
 class ProgressBarState:     # state is set by main window when a file is loaded.
@@ -48,12 +52,16 @@ def getUrlFrom(row: pd.Series):
     return "https://apps-hrc.adi.adies.lan/mailer/new-ticket?" + encoded_query
 
 
-def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str): 
+def genPDFsWithAveryZweckform3483Format(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str): 
+    """
+    Generate a pdf containing QR codes for each row of `entries` using Avery Zweckform 3483 format (large vertical). Logo on top, QR 
+    in middle, `qrCaption` underneath. If `is_eq_csv` is True, equipment info will be added as last line, otherwise, meeting room info. 
+    `progressBar` is used to update the progress bar in the calling parent window. Sticker format is (width, height) = (10.4 cm, 14.7 cm)
+    """
     progressBar.progressBar.setValue(0)
     
-    print("genLargeVerticalQRPDFsFor")
     QRCodeSize = 100 * mm
-    width, height = A4
+    _, height = A4
     
     xStart, yStart = 15 * mm, height - 33 * mm
     x, y = xStart, yStart
@@ -63,18 +71,14 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     count = 0
     
     for index, (_, row) in enumerate(entries.iterrows()):
-        
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=1.25*HRC_LOGO_WIDTH, height=1.25*HRC_LOGO_HEIGHT)
         
         y -= QRCodeSize
         x -= 12 * mm
         
         url = getUrlFrom(row)
-        
         updateProgressBar(index, entries, url, progressBar)
-        
         c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)                    # draw the QR code
-        
         drawText(c=c, row=row, x=x + QRCodeSize / 2, yText=y, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=QRCodeSize - 10 * mm, maxFontSize=16, max_lines=2)
         
         count += 1
@@ -94,15 +98,18 @@ def genLargeVerticalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBa
     
     progressBar.progressBar.setValue(100)
     c.save()
-    print(f"LOG: PDF saved as: {outputPath}")
 
 
-def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str): # entries (code, model, image)
+def genPDFsWithAveryZweckform3424Format(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str):
+    """
+    Generate a pdf containing QR codes for each row of `entries` using Avery Zweckform 3424 format (medium size, horizontal). Logo top left, 
+    `qrCaption` bottom left, QR to the right. If `is_eq_csv` is True, equipment info will be added as last line, otherwise, meeting room info. 
+    `progressBar` is used to update the progress bar in the calling parent window. Sticker format is (width, height) = (10.4 cm, 4.8 cm)
+    """
     progressBar.progressBar.setValue(0)
     
-    print("genMediumHorizontalQRPDFsFor")
     QRCodeSize = 44 * mm
-    width, height = A4
+    _, height = A4
     xStart, yStart = 3 * mm, height - 26 * mm
     x, y = xStart, yStart
     maxFontSize = 12
@@ -112,8 +119,6 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
-        
-        
         yText = drawText(c=c, row=row, x=x + 27*mm, yText=y - maxFontSize, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=HRC_LOGO_WIDTH - 10 * mm, maxFontSize=maxFontSize, max_lines=3)
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
@@ -139,15 +144,18 @@ def genMediumHorizontalQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progres
     
     progressBar.progressBar.setValue(100)
     c.save()
-    print(f"LOG: PDF saved as :{outputPath}")   
 
 
-def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str):
+def genPDFsWithAveryZweckform3661Format(is_eq_csv: bool, entries: pd.DataFrame, progressBar: ProgressBarState, outputPath: str, qrCaption: str):
+    """
+    Generate a pdf containing QR codes for each row of `entries` using Avery Zweckform 3661 format (small squares). QR code at the top, `qrCaption` 
+    underneath, If `is_eq_csv` is True, equipment info will be added as last line, otherwise, meeting room info. `progressBar` is used to update 
+    the progress bar in the calling parent window. Sticker format is (width, height) = (6.9 cm, 6.7 cm)
+    """
     progressBar.progressBar.setValue(0)
     
-    print("genSmallSquareQRPDFsFor")
     QRCodeSize = 60 * mm
-    width, height = A4
+    _, height = A4
     xStart, yStart = 2.5 * mm, height - 10 * mm - 58 * mm                                       # top-margin minus 5 height of sticker square (Zweckform 3661)
     x, y = xStart, yStart
     
@@ -156,11 +164,8 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
         url = getUrlFrom(row)
-        
         updateProgressBar(index, entries, url, progressBar)
-        
         c.drawImage(getQRImageReaderFromRow(url, True), x, y, width=QRCodeSize, height=QRCodeSize)
-        
         drawText(c=c, row=row, x=x + 30*mm, yText=y, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=QRCodeSize, maxFontSize=10, max_lines=2)
         
         count += 1
@@ -179,7 +184,6 @@ def genSmallSquareQRPDFsFor(is_eq_csv: bool, entries: pd.DataFrame, progressBar:
     progressBar.progressBar.setValue(100)
     
     c.save()
-    print(f"LOG: PDF saved as :{outputPath}")   
         
 
 def getQRImageReaderFromRow(url: str, embbed_logo: bool = False) -> ImageReader:
@@ -224,9 +228,6 @@ def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv
     depending on `is_eq_csv`.
     """
     global OPTIMAL_LINE_WIDTH   # this avoids recomputing it at every call to drawText()
-    
-    #optimalLineWidth = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines)
-    
     OPTIMAL_LINE_WIDTH = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines) if OPTIMAL_LINE_WIDTH == None else OPTIMAL_LINE_WIDTH
     
     wLines: list[str] = textwrap.wrap(qrCaption, width=OPTIMAL_LINE_WIDTH, max_lines=max_lines)   # wrap lines to max_lines
@@ -250,6 +251,7 @@ def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv
     c.drawCentredString(x, yText, wLines[-1])           # draw equipment or meeting room info in bold.
     return yText
 
+
 def split_string_at_middle(text: str) -> list[str]:
     lhalf, rhalf = text[:len(text) // 2], text[(len(text) // 2):]
     
@@ -257,6 +259,7 @@ def split_string_at_middle(text: str) -> list[str]:
         return [lhalf, rhalf]
     else:
         return [lhalf + "-", rhalf]
+
 
 def updateProgressBar(index: int, entries: pd.DataFrame, url: str, progressBar: ProgressBarState):
     value = round(100 * cast(int, index) / entries.shape[0])

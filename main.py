@@ -1,3 +1,7 @@
+##############################################################################
+# A. Freeman 15/10/2024                         swissarthurfreeman@gmail.com #
+# Qt based GUI to generate QR codes encoding equipment information for HRC.  #
+##############################################################################
 import ctypes
 import sys, os
 import pandas as pd
@@ -9,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QIcon, QFontDatabase, QFont
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
-from pdf import genLargeVerticalQRPDFsFor, genMediumHorizontalQRPDFsFor, genSmallSquareQRPDFsFor, ProgressBarState
+from pdf import genPDFsWithAveryZweckform3483Format, genPDFsWithAveryZweckform3424Format, genPDFsWithAveryZweckform3661Format, ProgressBarState
 
 
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('hrc.exploitation-si.genqr')
@@ -31,9 +35,9 @@ class GenerationConfig:
     @staticmethod
     def default():
         return GenerationConfig([       # Hardcoded QR code formats and their respective generation function, add new formats here.
-            QRCodeFormat("Grand Vertical (largeur, hauteur) = (10.4 cm, 14.7 cm)", genLargeVerticalQRPDFsFor), 
-            QRCodeFormat("Moyen Horizontal (largeur, hauteur) = (10.4 cm, 4.8 cm)", genMediumHorizontalQRPDFsFor),
-            QRCodeFormat("Petit Carré (largeur, hauteur) = (6.9 cm, 6.7 cm)", genSmallSquareQRPDFsFor)
+            QRCodeFormat("Grand Vertical (largeur, hauteur) = (10.4 cm, 14.7 cm)", genPDFsWithAveryZweckform3483Format), 
+            QRCodeFormat("Moyen Horizontal (largeur, hauteur) = (10.4 cm, 4.8 cm)", genPDFsWithAveryZweckform3424Format),
+            QRCodeFormat("Petit Carré (largeur, hauteur) = (6.9 cm, 6.7 cm)", genPDFsWithAveryZweckform3661Format)
         ])
     
     def getFormatsStrings(self) -> list[str]:
