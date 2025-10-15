@@ -119,14 +119,13 @@ def genPDFsWithAveryZweckform3424Format(is_eq_csv: bool, entries: pd.DataFrame, 
     count = 0
     for index, (_, row) in enumerate(entries.iterrows()):
         c.drawImage("./assets/hrc-logo.jpg", x, y, width=0.9*HRC_LOGO_WIDTH, height=0.9*HRC_LOGO_HEIGHT)
-        yText = drawText(c=c, row=row, x=x + 27*mm, yText=y - maxFontSize, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=HRC_LOGO_WIDTH - 10 * mm, maxFontSize=maxFontSize, max_lines=3)
+        drawText(c=c, row=row, x=x + 27*mm, yText=y - maxFontSize, is_eq_csv=is_eq_csv, qrCaption=qrCaption, maxTextWidth=HRC_LOGO_WIDTH - 10 * mm, maxFontSize=maxFontSize, max_lines=3)
         
         x += 55*mm                  # move cursor bottom right of text to draw QR code
-        y = yText - 3 * mm
         
         url = getUrlFrom(row)
         updateProgressBar(index, entries, url, progressBar)
-        c.drawImage(getQRImageReaderFromRow(url), x, y, width=QRCodeSize, height=QRCodeSize)
+        c.drawImage(getQRImageReaderFromRow(url), x, y - (QRCodeSize // 2) + 2 * mm, width=QRCodeSize, height=QRCodeSize)
         
         count += 1
         
@@ -219,6 +218,7 @@ def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
         else:
             width += 1
 
+MAX_LINES = None
 
 def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int) -> float:
     """
@@ -226,11 +226,8 @@ def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv
     font size will be computed such as the longest wrapped line doesn't exceed `maxTextWidth` and is of maximum font size `maxFontSize`. `row` will 
     be used to write either **row[Modèle] row[Code matériel]** as last line or **Salle de Réunion row[Numéro de Signalétique] row[Localisation]**
     depending on `is_eq_csv`.
-    """
-    global OPTIMAL_LINE_WIDTH   # this avoids recomputing it at every call to drawText()
-    OPTIMAL_LINE_WIDTH = getOptimalWrapWidthForText(qrCaption, max_lines=max_lines) if OPTIMAL_LINE_WIDTH == None else OPTIMAL_LINE_WIDTH
-    
-    wLines: list[str] = textwrap.wrap(qrCaption, width=OPTIMAL_LINE_WIDTH, max_lines=max_lines)   # wrap lines to max_lines
+    """  
+    wLines: list[str] = textwrap.wrap(qrCaption, width=getOptimalWrapWidthForText(qrCaption, max_lines=max_lines), max_lines=max_lines)   # wrap lines to max_lines
     wLines.append(
         f"{row["Modèle"]} {row["Code matériel"]}" if is_eq_csv else 
         f"Salle de Réunion {row["Numéro de Signalétique"]} {row["Localisation"]}"
@@ -249,8 +246,7 @@ def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv
     
     c.setFont("NettoBold", fontSize)
     c.drawCentredString(x, yText, wLines[-1])           # draw equipment or meeting room info in bold.
-    return yText
-
+    
 
 def split_string_at_middle(text: str) -> list[str]:
     lhalf, rhalf = text[:len(text) // 2], text[(len(text) // 2):]
