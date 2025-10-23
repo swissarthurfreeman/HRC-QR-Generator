@@ -218,7 +218,7 @@ def getOptimalWrapWidthForText(text: str, max_lines: int = 2):
             width += 1
 
 
-def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int) -> float:
+def drawText(c: canvas.Canvas, row: pd.Series, x: float, yText: float, is_eq_csv: bool, qrCaption: str, maxTextWidth: float, maxFontSize: float, max_lines: int):
     """
     Draw provided text `qrCaption` centered at position x starting at height `yText`. `qrCaption` will be wrapped to a max of `max_lines` and it's 
     font size will be computed such as the longest wrapped line doesn't exceed `maxTextWidth` and is of maximum font size `maxFontSize`. `row` will 
